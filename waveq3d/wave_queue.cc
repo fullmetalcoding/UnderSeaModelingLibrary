@@ -147,6 +147,7 @@ void wave_queue::init_wavefronts() {
     ode_integ::ab3_ndir(_time_step, _past, _prev, _curr, _next);
     _next->update();
     _next->path_length = _next->distance + _curr->path_length;
+    _next->active = _curr->active;
 }
 
 /**
@@ -181,6 +182,7 @@ void wave_queue::step() {
     _next->upper = _curr->upper;
     _next->lower = _curr->lower;
     _next->caustic = _curr->caustic;
+    _next->active = _curr->active;
 
     // search for eigenray collisions with acoustic targets
 
@@ -200,6 +202,9 @@ void wave_queue::detect_reflections() {
 
     for (size_t de = 0; de < num_de(); ++de) {
         for (size_t az = 0; az < num_az(); ++az) {
+            if (!_curr->active(de, az)) {
+                continue;
+            }
             detect_volume_scattering(de, az);
             if (!detect_reflections_surface(de, az)) {
                 if (!detect_reflections_bottom(de, az)) {
@@ -220,11 +225,19 @@ void wave_queue::detect_reflections() {
  */
 // NOLINTNEXTLINE(misc-no-recursion)
 bool wave_queue::detect_reflections_surface(size_t de, size_t az) {
+    if (!_curr->active(de, az)) {
+        return false;
+    }
     if (_next->position.altitude(de, az) > 0.0) {
         if (_reflection_model->surface_reflection(de, az)) {
             _next->surface(de, az) += 1;
             _curr->surface(de, az) = _prev->surface(de, az) =
                 _past->surface(de, az) = _next->surface(de, az);
+            if (above_bounce_threshold(_next, de, az)) {
+                _next->active(de, az) = _curr->active(de, az) =
+                    _prev->active(de, az) = _past->active(de, az) = false;
+                return true;  // reflection occurred but ray deactivated
+            }
             detect_volume_scattering(de, az);
             detect_reflections_bottom(de, az);
             return true;  // indicate a surface reflection
@@ -238,6 +251,9 @@ bool wave_queue::detect_reflections_surface(size_t de, size_t az) {
  */
 // NOLINTNEXTLINE(misc-no-recursion)
 bool wave_queue::detect_reflections_bottom(size_t de, size_t az) {
+    if (!_curr->active(de, az)) {
+        return false;
+    }
     double height;
     wposition1 pos(_next->position, de, az);
     _ocean->bottom()->height(pos, &height, nullptr);
@@ -247,6 +263,11 @@ bool wave_queue::detect_reflections_bottom(size_t de, size_t az) {
             _next->bottom(de, az) += 1;
             _curr->bottom(de, az) = _prev->bottom(de, az) =
                 _past->bottom(de, az) = _next->bottom(de, az);
+            if (above_bounce_threshold(_next, de, az)) {
+                _next->active(de, az) = _curr->active(de, az) =
+                    _prev->active(de, az) = _past->active(de, az) = false;
+                return true;  // reflection occurred but ray deactivated
+            }
             detect_volume_scattering(de, az);
             detect_reflections_surface(de, az);
             return true;  // indicate a surface reflection
@@ -259,6 +280,9 @@ bool wave_queue::detect_reflections_bottom(size_t de, size_t az) {
  *  Detects upper and lower vertices along the wavefront
  */
 void wave_queue::detect_vertices(size_t de, size_t az) {
+    if (!_curr->active(de, az)) {
+        return;
+    }
     double L = _curr->ndirection.rho(de, az);
     double R = _next->ndirection.rho(de, az);
     if (L * R < 0.0 && R < 0.0) {
@@ -272,6 +296,9 @@ void wave_queue::detect_vertices(size_t de, size_t az) {
  *  Detects and processes the caustics along the next wavefront
  */
 void wave_queue::detect_caustics(size_t de, size_t az) {
+    if (!_curr->active(de, az)) {
+        return;
+    }
     if (de < _max_de) {
         double A = _curr->position.rho(de + 1, az);
         double B = _curr->position.rho(de, az);
@@ -298,7 +325,7 @@ void wave_queue::detect_volume_scattering(size_t de, size_t az) {
     if (!has_eigenverb_listeners()) {
         return;
     }
-    if (above_bounce_threshold(_curr, de, az)) {
+    if (!_curr->active(de, az) || above_bounce_threshold(_curr, de, az)) {
         return;
     }
     for (size_t i = 0; i < _ocean->num_volume(); ++i) {
@@ -371,6 +398,9 @@ void wave_queue::detect_eigenrays() {
             // Loop over all rays
             for (size_t de = 1; de < _max_de; ++de) {
                 for (size_t az = az_start; az < _max_az; ++az) {
+                    if (!_curr->active(de, az)) {
+                        continue;
+                    }
                     // *******************************************
                     // When central ray is at the edge of ray family
                     // it prevents edges from acting as CPA, if so, go to next
