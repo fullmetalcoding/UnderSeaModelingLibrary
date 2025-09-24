@@ -241,6 +241,11 @@ class USML_DECLSPEC wave_front {
     matrix<int> lower;
 
     /**
+     * Indicates whether each ray is still active.
+     */
+    matrix<bool> active;
+
+    /**
      * Mark places where the wavefront changes the surface, bottom, or caustics.
      */
     matrix<bool> on_edge;

@@ -39,6 +39,7 @@ wave_front::wave_front(const ocean_model::csptr& ocean,
       caustic(num_de, num_az),
       upper(num_de, num_az),
       lower(num_de, num_az),
+      active(num_de, num_az),
       on_edge(num_de, num_az),
       targets(targets),
       _ocean(ocean),
@@ -57,6 +58,12 @@ wave_front::wave_front(const ocean_model::csptr& ocean,
     upper.clear();
     lower.clear();
     on_edge.clear();
+
+    for (size_t n1 = 0; n1 < num_de; ++n1) {
+        for (size_t n2 = 0; n2 < num_az; ++n2) {
+            active(n1, n2) = true;
+        }
+    }
 
     for (size_t n1 = 0; n1 < num_de; ++n1) {
         for (size_t n2 = 0; n2 < num_az; ++n2) {
