@@ -329,6 +329,12 @@ class USML_DECLSPEC wave_queue : public eigenray_notifier,
      */
     matrix<double> _targets_sin_theta;
 
+    /** Straight-line distance from the source to each target (meters). */
+    matrix<double> _target_range;
+
+    /** Earliest possible arrival time for each target using the upper bound. */
+    matrix<double> _target_min_arrival;
+
     /** Reference to the reflection model component. */
     reflection_model* _reflection_model;
 

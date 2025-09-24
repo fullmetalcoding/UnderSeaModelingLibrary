@@ -24,6 +24,11 @@ using namespace usml::eigenrays;
 using namespace usml::eigenverbs;
 using namespace usml::waveq3d;
 
+namespace {
+/** Upper bound on sound speed (m/s) used for time-of-flight gating. */
+constexpr double SOUND_SPEED_UPPER_BOUND = 1650.0;
+}  // namespace
+
 /**
  * Initialize a propagation scenario.
  */
@@ -53,6 +58,16 @@ wave_queue::wave_queue(const ocean_model::csptr& ocean,
     }
     if (_target_pos != nullptr) {
         _targets_sin_theta = sin(_target_pos->theta());
+        _target_range.resize(_target_pos->size1(), _target_pos->size2());
+        _target_min_arrival.resize(_target_pos->size1(), _target_pos->size2());
+        for (size_t t1 = 0; t1 < _target_pos->size1(); ++t1) {
+            for (size_t t2 = 0; t2 < _target_pos->size2(); ++t2) {
+                const wposition1 target(*_target_pos, t1, t2);
+                const double range = target.distance(_source_pos);
+                _target_range(t1, t2) = range;
+                _target_min_arrival(t1, t2) = range / SOUND_SPEED_UPPER_BOUND;
+            }
+        }
     }
 
     // check for sources outside of the water column
@@ -368,6 +383,11 @@ void wave_queue::detect_eigenrays() {
                 _de_branch = true;
             }
 
+            const double target_range = _target_range(t1, t2);
+            if ((_time + _time_step) < _target_min_arrival(t1, t2)) {
+                continue;
+            }
+
             // Loop over all rays
             for (size_t de = 1; de < _max_de; ++de) {
                 for (size_t az = az_start; az < _max_az; ++az) {
@@ -377,6 +397,12 @@ void wave_queue::detect_eigenrays() {
                     // de/az Also check to see if this ray is a duplicate.
 
                     if (_curr->on_edge(de, az)) {
+                        continue;
+                    }
+
+                    const double max_path_length = _next->path_length(de, az);
+                    if (!std::isfinite(max_path_length) ||
+                        max_path_length < target_range) {
                         continue;
                     }
 
