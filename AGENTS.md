@@ -9,6 +9,6 @@ The guidelines below apply to the entire repository.
   at `<parent>/usml` (rename the checkout to `usml` or create a `usml`
   symlink pointing to this directory) so includes such as
   `<usml/ublas/randgen.h>` resolve correctly.
-- Run the CMake-based builds or unit tests that are relevant to your changes
-  and report their status in the final summary.
+- Run the CMake-based builds and unit tests, ensuring that you invoke the usml_test executable created by Cmake for the combined Boost.Test regression suite.
+- Ensure you check the results of all tests that are relevant to your changes and report their status in the final summary.
 
